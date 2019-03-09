@@ -1,0 +1,14 @@
+{
+	"type": "record",
+	"name": "ApplicationVersionAvailable",
+	"fields": [
+		{
+			"name": "App",
+			"type": "string"
+		},
+		{
+			"name": "Version",
+			"type": "string"
+		}
+	]
+}
