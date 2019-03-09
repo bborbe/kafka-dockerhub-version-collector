@@ -69,7 +69,7 @@ type application struct {
 	KafkaBrokers      string        `required:"true" arg:"kafka-brokers" env:"KAFKA_BROKERS" usage:"kafka brokers"`
 	KafkaTopic        string        `required:"true" arg:"kafka-topic" env:"KAFKA_TOPIC" usage:"kafka topic"`
 	SchemaRegistryUrl string        `required:"true" arg:"kafka-schema-registry-url" env:"KAFKA_SCHEMA_REGISTRY_URL" usage:"kafka schema registry url"`
-	Repository        string        `required:"true" arg:"repository" env:"REPOSITORY" usage:"Docker Repository"`
+	Repositories      string        `required:"true" arg:"repositories" env:"REPOSITORIES" usage:"Docker Repositories"`
 }
 
 func (a *application) Run(ctx context.Context) error {
@@ -100,8 +100,16 @@ func (a *application) runCron(ctx context.Context) error {
 	defer producer.Close()
 
 	httpClient := http.DefaultClient
+	var fetcherlist []version.Fetcher
+	for _, repo := range strings.Split(a.Repositories, ",") {
+		fetcherlist = append(
+			fetcherlist,
+			version.NewFetcher(httpClient, "https://hub.docker.com", repo),
+		)
+	}
+
 	syncer := version.NewSyncer(
-		version.NewFetcher(httpClient, "https://hub.docker.com", a.Repository),
+		version.NewFetcherList(fetcherlist),
 		version.NewSender(
 			producer,
 			schema.NewRegistry(

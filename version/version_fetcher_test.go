@@ -19,11 +19,14 @@ import (
 var _ = Describe("Version Fetcher", func() {
 	var fetcher version.Fetcher
 	var server *ghttp.Server
+	var repo string
 	BeforeEach(func() {
 		server = ghttp.NewServer()
+		repo = "bborbe/test"
 		fetcher = version.NewFetcher(
 			http.DefaultClient,
 			server.URL(),
+			repo,
 		)
 	})
 	AfterEach(func() {
@@ -31,7 +34,7 @@ var _ = Describe("Version Fetcher", func() {
 	})
 
 	It("returns nothing if empty list", func() {
-		server.RouteToHandler(http.MethodGet, "/v2/google_containers/hyperkube-amd64/tags/list", func(resp http.ResponseWriter, req *http.Request) {
+		server.RouteToHandler(http.MethodGet, "/v2/repositories/bborbe/test/tags/", func(resp http.ResponseWriter, req *http.Request) {
 			fmt.Fprint(resp, `{}`)
 		})
 		versions := make(chan avro.ApplicationVersionAvailable)
@@ -47,8 +50,21 @@ var _ = Describe("Version Fetcher", func() {
 		Expect(list).To(HaveLen(0))
 	})
 	It("returns versions", func() {
-		server.RouteToHandler(http.MethodGet, "/v2/google_containers/hyperkube-amd64/tags/list", func(resp http.ResponseWriter, req *http.Request) {
-			fmt.Fprint(resp, `{"tags":["v1","v2","v3"]}`)
+		server.RouteToHandler(http.MethodGet, "/v2/repositories/bborbe/test/tags/", func(resp http.ResponseWriter, req *http.Request) {
+			fmt.Fprint(resp, `
+{
+"results": [
+{
+"name": "v1"
+},
+{
+"name": "v2"
+},
+{
+"name": "v3"
+}
+]
+}`)
 		})
 		versions := make(chan avro.ApplicationVersionAvailable)
 		var list []avro.ApplicationVersionAvailable
@@ -61,15 +77,15 @@ var _ = Describe("Version Fetcher", func() {
 			list = append(list, version)
 		}
 		Expect(list).To(HaveLen(3))
-		Expect(list[0].App).To(Equal("Kubernetes"))
+		Expect(list[0].App).To(Equal("docker.io/bborbe/test"))
 		Expect(list[0].Version).To(Equal("v1"))
-		Expect(list[1].App).To(Equal("Kubernetes"))
+		Expect(list[1].App).To(Equal("docker.io/bborbe/test"))
 		Expect(list[1].Version).To(Equal("v2"))
-		Expect(list[2].App).To(Equal("Kubernetes"))
+		Expect(list[2].App).To(Equal("docker.io/bborbe/test"))
 		Expect(list[2].Version).To(Equal("v3"))
 	})
 	It("returns an error if not valid json", func() {
-		server.RouteToHandler(http.MethodGet, "/v2/google_containers/hyperkube-amd64/tags/list", func(resp http.ResponseWriter, req *http.Request) {
+		server.RouteToHandler(http.MethodGet, "/v2/repositories/bborbe/test/tags/", func(resp http.ResponseWriter, req *http.Request) {
 			fmt.Fprint(resp, `asdf`)
 		})
 		versions := make(chan avro.ApplicationVersionAvailable)
@@ -78,7 +94,7 @@ var _ = Describe("Version Fetcher", func() {
 		Expect(err).To(HaveOccurred())
 	})
 	It("returns an error if status not 2xx", func() {
-		server.RouteToHandler(http.MethodGet, "/v2/google_containers/hyperkube-amd64/tags/list", func(resp http.ResponseWriter, req *http.Request) {
+		server.RouteToHandler(http.MethodGet, "/v2/repositories/bborbe/test/tags/", func(resp http.ResponseWriter, req *http.Request) {
 			resp.WriteHeader(http.StatusNotFound)
 		})
 		versions := make(chan avro.ApplicationVersionAvailable)
@@ -92,6 +108,7 @@ var _ = Describe("Version Fetcher", func() {
 				Transport: &ErrorRoundTripper{},
 			},
 			server.URL(),
+			repo,
 		)
 		versions := make(chan avro.ApplicationVersionAvailable)
 		defer close(versions)
@@ -101,7 +118,7 @@ var _ = Describe("Version Fetcher", func() {
 	It("returns without error if context is cancel", func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		server.RouteToHandler(http.MethodGet, "/v2/google_containers/hyperkube-amd64/tags/list", func(resp http.ResponseWriter, req *http.Request) {
+		server.RouteToHandler(http.MethodGet, "/v2/repositories/bborbe/test/tags/", func(resp http.ResponseWriter, req *http.Request) {
 			cancel()
 			fmt.Fprint(resp, `{"tags":["v1","v2","v3"]}`)
 		})
